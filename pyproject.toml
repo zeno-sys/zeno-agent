@@ -1,0 +1,23 @@
+[project]
+name = "zeno-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "mcp>=1.27.0",
+    "openai>=2.33.0",
+    "pillow>=11.0.0",
+    "python-dotenv>=1.2.2",
+    "pyyaml>=6.0.3",
+    "tavily-python>=0.7.24",
+    "wcmatch>=10.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+addopts = "-s"

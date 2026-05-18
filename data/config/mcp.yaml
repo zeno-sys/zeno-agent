@@ -1,0 +1,26 @@
+mcp_servers:
+  word_server:
+    command: "uv"      # stdio servers
+    args:
+      - "--directory"
+      - "D:/Code/mcp/office-editor-mcp-main/office-editor-mcp-main"
+      - "run"
+      - "word_server.py"
+    env:
+      LOG_LEVEL: "info"
+      PYTHONUNBUFFERED: "1"
+      PYTHONIOENCODING: "utf-8"
+      PYTHONUTF8: "1"
+
+    # # OR
+    # url: "..."          # HTTP servers
+    # headers: {}
+
+    enabled: true
+    timeout: 120
+    connect_timeout: 60
+    # tools:
+    #   include: []
+    #   exclude: []
+    #   resources: true
+    #   prompts: true
