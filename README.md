@@ -136,7 +136,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 ### 安装项目
 
 ```bash
-git clone https://github.com/<your-org>/zeno-agent.git
+git clone https://github.com/zeno-sys/zeno-agent.git
 cd zeno-agent
 uv sync
 ```
