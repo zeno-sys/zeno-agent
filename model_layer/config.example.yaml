@@ -1,0 +1,28 @@
+# Copy to a path and set MODEL_LAYER_CONFIG=/path/to/config.yaml
+
+tasks:
+  agent:
+    provider: default
+    model: ${MODEL_NAME}
+    stream: true
+    extra_body:
+      enable_thinking: false
+  auxiliary:
+    provider: default
+    model: ${MODEL_AUXILIARY_NAME}
+    max_tokens: 500
+    extra_body:
+      enable_thinking: false
+  structured:
+    provider: default
+    model: ${MODEL_NAME}
+    extra_body:
+      enable_thinking: false
+
+providers:
+  default:
+    type: openai_compatible
+    base_url: ${OPENAI_BASE_URL}
+    api_key: ${OPENAI_API_KEY}
+    default_extra_body:
+      enable_thinking: false

@@ -8,8 +8,26 @@ import logging
 import threading
 from typing import Callable, Optional
 
-def call_llm(task: str, messages: list, max_tokens: int, temperature: float, timeout: float) -> str:
-    return "title"
+def call_llm(
+    task: str,
+    messages: list,
+    max_tokens: int,
+    temperature: float,
+    timeout: float,
+):
+    """Route auxiliary LLM calls through the model layer."""
+    from model_layer import ModelRequest, get_default_model_client
+    from model_layer.types import TASK_AUXILIARY
+
+    model_task = TASK_AUXILIARY if task in ("title_generation", "auxiliary") else task
+    req = ModelRequest(
+        task=model_task,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        metadata={"timeout": timeout},
+    )
+    return get_default_model_client().complete(req).raw
 
 logger = logging.getLogger(__name__)
 

@@ -17,10 +17,10 @@ from agent.core.run_events import (
 )
 from agent.core.system_prompt import SystemPromptBuilder
 from agent.tool.registry import registry as tool_registry
-from models.openai_client import default_openai_client
+from model_layer import ModelRequest, get_default_model_client
 from utils.normalize_messages import normalize_messages_openai
 from agent.command import resolve_user_input
-from agent.core.multimodal import validate_image_paths
+from agent.core.multimodal import ImageAttachmentParseError, validate_image_paths
 from agent.core.user_input import UserInput, user_input_to_message
 from utils.pretty_print import (
     print_clarify_prompt,
@@ -97,21 +97,17 @@ def run_one_turn(context: AgentContext) -> Generator[RunEvent, None, bool]:
     def _open_chat_stream(
         msgs: list[dict[str, Any]],
         tls: list[dict[str, Any]],
-        model: str = os.getenv("MODEL_NAME"),
+        model: str | None = os.getenv("MODEL_NAME"),
     ) -> Any:
-        req: dict[str, Any] = {
-            "messages": msgs,
-            "tools": tls,
-            "model": model,
-            "extra_body": {
-                "enable_thinking": False,
-                "session_id": context.session_id,
-            },
-            "stream": True,
-        }
-        if os.getenv("OPENAI_STREAM_INCLUDE_USAGE", "").lower() in ("1", "true", "yes"):
-            req["stream_options"] = {"include_usage": True}
-        return default_openai_client.chat.completions.create(**req)
+        model_req = ModelRequest(
+            task="agent",
+            messages=msgs,
+            tools=tls,
+            model=model,
+            stream=True,
+            metadata={"session_id": context.session_id},
+        )
+        return get_default_model_client().stream(model_req)
 
     stream = hook_manager.run_wrap_model_call(
         _open_chat_stream,
@@ -373,7 +369,11 @@ if __name__ == "__main__":
         if query.strip().lower() in ("q", "exit", ""):
             break
 
-        resolved = resolve_user_input(query)
+        try:
+            resolved = resolve_user_input(query)
+        except ImageAttachmentParseError as exc:
+            print(f"图片附件: {exc}")
+            continue
         if resolved.is_command and resolved.command_name:
             if not resolved.is_help and not resolved.unknown_command:
                 print_command_invoked(resolved.command_name)

@@ -1,6 +1,6 @@
 # Zeno Agent
 
-面向 OpenAI 兼容 API 的轻量级 Agent 框架：工具调用循环、可插拔 Hook、Skills / 斜杠命令、文件 Harness 与多模态等。
+面向 OpenAI 兼容 API 的轻量级 Agent 框架：工具调用循环、可插拔 Hook、Skills / 斜杠命令、虚拟文件系统与多模态等。
 
 
 代码结构尽量清晰、模块边界明确：你可以从 Agent 循环、工具注册、Hook 、MCP、Skills、SubAgent等核心原理，理解「模型 → 工具 → 再推理」的完整链路；也可以在此基础上扩展工具、Skills、命令与接入方式，作为个人或团队 Agent 项目的起点。
@@ -14,9 +14,9 @@
 | --------------- | ------------------------------------------------------------------------------------- |
 | **Agent 循环**    | 多轮 `tool_calls` 直至结束；`run_loop` 以事件流输出，便于 CLI / 未来 SSE                                |
 | **工具注册表**       | 统一 schema、分发与可选 `check_fn`；支持依赖注入（memory、todo、filesystem 等）                           |
-| **文件 Harness**  | 基于 `BackendProtocol` 的读/写/编辑/grep/glob/上传/下载；虚拟绝对路径、路径校验与截断提示                         |
+| **虚拟文件系统**  | 基于 `BackendProtocol` 的读/写/编辑/grep/glob/上传/下载；虚拟绝对路径、路径校验与截断提示                         |
 | **Skills**      | `skills/**/SKILL.md`（agentskills.io 风格）；`skills_list` / `skill_view` / `skill_manage` |
-| **斜杠命令**        | `/命令名` 展开 `commands/*.md`；与 Cursor `.cursor/commands` 目录兼容                            |
+| **斜杠命令**        | `/命令名` 展开 `commands/*.md`                           |
 | **Hook 体系**     | Session / Loop / PreModel / WrapModel / Tool 等生命周期扩展点                                 |
 | **多模态**         | CLI 使用 `@image <路径>` 附加本地图片（PNG/JPEG/WebP/GIF），自动压缩与 data URL                         |
 | **MCP（可选）**     | `agent/mcp` 支持 MCP 工具发现与 OAuth；CLI 默认注释，可按需启用                                         |
@@ -33,7 +33,7 @@ Zeno Agent 处于**早期实验阶段**：核心 Agent 循环、工具注册、�
 
 ### 致谢与参考
 
-本仓库在设计与实现上借鉴了多个开源/产品形态，**并非**它们的 fork 或官方替代品。其中，**Hermes** 主要影响了工具注册与分发、`ToolRegistry` 形态，以及 MCP 工具发现、Schema 转换与 OAuth 等相关实现；**LangChain DeepAgents** 主要影响了 `BackendProtocol` 文件后端抽象（读/写/编辑/grep/glob 等 Harness）。此外，在终端 Agent 交互、分层指令（`agent.md`）、Skills / 斜杠命令等思路上也参考了 Claude Code、OpenCode、Agent Skills 与 Cursor 等常见实践。
+本仓库在设计与实现上借鉴了多个开源/产品形态，**并非**它们的 fork 或官方替代品。其中，**Hermes** 主要影响了工具注册与分发、`ToolRegistry` 形态，以及 MCP 工具发现、Schema 转换与 OAuth 等相关实现；**LangChain DeepAgents** 主要影响了 `BackendProtocol` 文件后端抽象（读/写/编辑/grep/glob 等 Harness）。此外，在终端 Agent 交互、分层指令、Skills 等思路上也参考了 Claude Code、OpenCode、Agent Skills 与 Cursor 等常见实践。
 
 
 ### 当前局限（使用前请知悉）
@@ -41,7 +41,7 @@ Zeno Agent 处于**早期实验阶段**：核心 Agent 循环、工具注册、�
 | 模块 | 现状 |
 | ---- | ---- |
 | **系统提示** | `SystemPromptBuilder` 已支持分段组装与 `agent.md` 链，但 Skills / Memory **尚未**注入系统提示（代码中仍为注释）；无提示快照、缓存与增量更新 |
-| **CLI** | `agent/run_cli.py` 仅用于快速验证：无会话恢复、无 `--session-id`（待实现）、历史仅存内存；MCP 默认关闭（可取消注释进行手动开启） |
+| **CLI** | `agent/run_cli.py` 仅用于快速验证，暂时使用print/input替代：无会话恢复、无 `--session-id`（待实现）、历史仅存内存；MCP 默认关闭（可取消注释进行手动开启） |
 | **系统 Harness** | 无上下文压缩与窗口预算管理；无细粒度权限/沙箱策略；工具失败后的统一重试与降级策略仍较粗糙 |
 | **文件 Harness** | 已有路径校验与结果截断，但设备文件黑名单、大文件分段提示、重复读取去重等**未实现** |
 | **HTTP API** | `api/` 目录为预留，尚无对外服务与 SSE 网关 |
@@ -200,7 +200,7 @@ zeno-agent/
 ├── hooks/              # 默认 Hook（日志、打印、推荐追问等）
 ├── skills/             # 领域技能（SKILL.md）
 ├── commands/           # 斜杠命令 Markdown
-├── models/             # OpenAI 客户端封装
+├── model_layer/        # 模型调用中间层（路由、Provider、中间件）
 ├── utils/              # 消息规范化、图片压缩、终端美化等
 ├── tests/              # pytest 测试
 ├── docs/               # 设计文档
@@ -209,6 +209,7 @@ zeno-agent/
 
 更细的设计说明见：
 
+- [模型调用中间层设计](model_layer/DESIGN.md)
 - [斜杠命令设计](agent/command/DESIGN.md)
 - [工具开发指南](tools/TOOL_DEVELOPMENT.md)
 - [多模态设计](docs/多模态图片能力设计.md)
@@ -287,15 +288,6 @@ uv run pytest tests/test_backend_file_tools.py -v
 
 ---
 
-## 路线图
-
-当前探索方向（摘自 [Idea.md](Idea.md)）：
-
-- **多智能体**：动态配置、自动派生、生命周期管理
-- **文件 Harness 增强**：设备路径黑名单、大文件分段提示、重复读取去重（配合上下文压缩）
-
-欢迎 Issue / PR 讨论与共建。
-
 ---
 
 ## 贡献
@@ -311,7 +303,7 @@ uv run pytest tests/test_backend_file_tools.py -v
 
 ## 许可证
 
-尚未在仓库根目录添加 `LICENSE` 文件。开源发布前请自行选择并补充许可证（例如 MIT / Apache-2.0）。
+本项目采用 [MIT License](LICENSE)，Copyright (c) 2026 zeno-sys。
 
 ---
 

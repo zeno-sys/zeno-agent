@@ -1,12 +1,12 @@
 import json
-import os
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from agent.core.multimodal import content_to_text
 from agent.hook.schema import LoopEndHook
-from models.openai_client import default_openai_client
+from model_layer import ModelRequest, get_default_model_client
+from model_layer.types import TASK_STRUCTURED
 from utils.pretty_print import print_recommended_questions
 
 
@@ -71,13 +71,13 @@ class LoopEndRecommendQuestionsHook(LoopEndHook):
         ]
 
         try:
-            response = default_openai_client.beta.chat.completions.parse(
-                model=os.getenv("MODEL_NAME"),
+            model_req = ModelRequest(
+                task=TASK_STRUCTURED,
                 messages=messages,
                 response_format=RecommendQuestions,
-                extra_body={"enable_thinking": False},
             )
-            content: RecommendQuestions | None = response.choices[0].message.parsed
+            response = get_default_model_client().complete_structured(model_req)
+            content: RecommendQuestions | None = response.message.parsed
         except Exception:
             return []
         return content.questions
