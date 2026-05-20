@@ -25,6 +25,10 @@ _DEFAULT_MAX_IMAGE_BYTES = 4 * 1024 * 1024
 _DEFAULT_MAX_IMAGES_PER_TURN = 4
 
 
+class ImageAttachmentParseError(ValueError):
+    """User-facing failure when parsing ``@image`` attachments."""
+
+
 def max_image_bytes() -> int:
     raw = os.getenv("MULTIMODAL_MAX_IMAGE_BYTES", "").strip()
     if not raw:
@@ -216,7 +220,7 @@ def _parse_quoted_path_segment(rest: str, start: int) -> tuple[str, int]:
             continue
         chars.append(ch)
         i += 1
-    raise ValueError("@image 路径引号未闭合")
+    raise ImageAttachmentParseError("@image 路径引号未闭合")
 
 
 def _is_resolved_image_file(path: Path) -> bool:
@@ -228,16 +232,19 @@ def _parse_path_segment_greedy(
     start: int,
     *,
     base_dir: Path | None,
-) -> tuple[str, int]:
-    """Parse one path after ``@image``; supports spaces (e.g. Windows ``Saved Pictures``)."""
+) -> tuple[str, int] | None:
+    """Parse one path after ``@image``; supports spaces (e.g. Windows ``Saved Pictures``).
+
+    Returns ``None`` when the segment is not a resolvable image path (e.g. trailing user text).
+    """
     if start >= len(rest):
-        raise ValueError("@image 后需要至少一个图片路径")
+        return None
 
     if rest[start] in ('"', "'"):
         raw, end = _parse_quoted_path_segment(rest, start)
         resolved = resolve_image_path(raw, base_dir=base_dir)
         if not _is_resolved_image_file(resolved):
-            raise FileNotFoundError(f"图片不存在或格式不支持: {raw}")
+            raise ImageAttachmentParseError(f"图片不存在或格式不支持: {raw}")
         return raw, end
 
     tail = rest[start:]
@@ -264,9 +271,7 @@ def _parse_path_segment_greedy(
         if _is_resolved_image_file(resolved):
             return raw, start + m.end()
 
-    raise FileNotFoundError(
-        f"无法解析 @image 后的路径（含空格时请用引号包裹）: {tail.split('@', 1)[0].strip()!r}"
-    )
+    return None
 
 
 def _extract_image_path_strings(
@@ -283,9 +288,18 @@ def _extract_image_path_strings(
             pos += 1
         if pos >= n or rest[pos] == "@":
             break
-        raw, pos = _parse_path_segment_greedy(rest, pos, base_dir=base_dir)
+        parsed = _parse_path_segment_greedy(rest, pos, base_dir=base_dir)
+        if parsed is None:
+            break
+        raw, pos = parsed
         paths.append(raw)
     return paths, pos
+
+
+_IMAGE_PATH_HINT = (
+    "无法识别 @image 后的图片路径。请提供存在的 PNG/JPEG/WebP/GIF 文件；"
+    '路径含空格时请用引号包裹，例如 @image "C:\\my photos\\a.png"'
+)
 
 
 def parse_image_attachments(
@@ -305,7 +319,7 @@ def parse_image_attachments(
         rest = text[match.end() :]
         raw_paths, consumed = _extract_image_path_strings(rest, base_dir=base_dir)
         if not raw_paths:
-            raise ValueError("@image 后需要至少一个图片路径")
+            raise ImageAttachmentParseError(_IMAGE_PATH_HINT)
         for raw in raw_paths:
             image_paths.append(resolve_image_path(raw, base_dir=base_dir))
         pos = match.end() + consumed

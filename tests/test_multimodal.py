@@ -9,6 +9,7 @@ import pytest
 
 from agent.command.command_resolver import resolve_user_input
 from agent.core.multimodal import (
+    ImageAttachmentParseError,
     build_openai_user_content,
     content_to_text,
     is_openai_multimodal_content,
@@ -75,6 +76,20 @@ def test_parse_image_windows_path_with_spaces(tmp_path: Path) -> None:
     assert text == "分析"
     assert len(paths) == 1
     assert paths[0].resolve() == img.resolve()
+
+
+def test_parse_image_path_then_user_text(tmp_path: Path) -> None:
+    img = tmp_path / "image.png"
+    img.write_bytes(b"\x89PNG\r\n\x1a\n")
+    text, paths = parse_image_attachments(f"@image {img} 这个图片描述")
+    assert len(paths) == 1
+    assert paths[0].resolve() == img.resolve()
+    assert text == "这个图片描述"
+
+
+def test_parse_image_invalid_path_raises_friendly_error() -> None:
+    with pytest.raises(ImageAttachmentParseError, match="无法识别 @image"):
+        parse_image_attachments("@image not-a-real-file.png")
 
 
 def test_parse_image_quoted_path_with_spaces(tmp_path: Path) -> None:
